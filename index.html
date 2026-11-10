@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Days of the Week - Interactive Learning App</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            width: 100vw;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background-color: #38bdf8;
+        }
+
+        /* Responsive full-screen background image setup */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image: url('bg.png'), url('bg.jpg');
+            background-position: center center;
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+
+        .font-fredoka {
+            font-family: 'Fredoka', cursive;
+        }
+
+        /* Fullscreen Overlay Windows */
+        .fullscreen-window {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .fullscreen-window.active-window {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Glassmorphic Container */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            border-radius: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Center-Bottom Floating Navigation Bar */
+        .center-pill-dock {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 3.5px solid rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.3), 0 0 25px rgba(56, 189, 248, 0.4);
+        }
+
+        .pill-tab-btn {
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .pill-tab-btn:hover {
+            transform: translateY(-3px) scale(1.03);
+        }
+
+        /* SVG Wing Flap Animations */
+        @keyframes flapLeft {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-30deg) translateY(-4px); }
+        }
+        @keyframes flapRight {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(30deg) translateY(-4px); }
+        }
+        .wing-left { transform-origin: 30px 50px; animation: flapLeft 0.35s ease-in-out infinite; }
+        .wing-right { transform-origin: 70px 50px; animation: flapRight 0.35s ease-in-out infinite; }
+
+        /* Floating Cloud Effect */
+        @keyframes floatCloud {
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(120vw); }
+        }
+        .cloud-1 { animation: floatCloud 45s linear infinite; }
+        .cloud-2 { animation: floatCloud 65s linear infinite 20s; }
+
+        /* Calendar Date Pulse */
+        @keyframes targetPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            70% { transform: scale(1.08); box-shadow: 0 0 0 14px rgba(245, 158, 11, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        .pulse-target {
+            animation: targetPulse 1.6s infinite;
+        }
+
+        /* Slots styling for missing letters */
+        .letter-slot {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2.2rem;
+            height: 3rem;
+            margin: 0 4px;
+            border-bottom: 4px solid #ffffff;
+            color: #fde047;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        .letter-slot.filled {
+            border-bottom-color: #facc15;
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.6); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(241, 245, 249, 0.5); }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+    </style>
+</head>
+<body class="relative min-h-screen text-slate-800 flex flex-col justify-between overflow-hidden">
+
+    <!-- FULLSCREEN BACKGROUND IMAGE LAYER (bg.png) -->
+    <div class="bg-layer"></div>
+
+    <!-- BACKGROUND FLOATING CLOUDS -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-10">
+        <div class="cloud-1 absolute top-12 left-0 text-white/40 text-8xl select-none">☁️</div>
+        <div class="cloud-2 absolute top-44 left-0 text-white/30 text-9xl select-none">☁️</div>
+    </div>
+
+    <!-- TOP CONTROL TOOLBAR -->
+    <header class="relative z-20 p-4 max-w-7xl mx-auto w-full flex items-center justify-between pointer-events-auto">
+        <div class="flex items-center gap-3 bg-white/85 backdrop-blur-md px-5 py-2.5 rounded-full shadow-lg border border-white">
+            <span class="text-3xl animate-bounce">🐤</span>
+            <span class="text-xl md:text-2xl font-bold font-fredoka text-sky-600 tracking-wide">Days of the Week</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button id="sound-toggle-btn" onclick="toggleMute()" class="px-5 py-2.5 bg-white/85 hover:bg-white text-sky-700 font-bold font-fredoka rounded-full shadow-md border border-white flex items-center gap-2 text-sm md:text-base transition transform active:scale-95 cursor-pointer">
+                <span id="sound-icon">🔊</span> <span>Sound</span>
+            </button>
+            <button onclick="toggleFullscreen()" class="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-900 font-bold font-fredoka rounded-full shadow-xl border-2 border-white flex items-center gap-2 text-sm md:text-base transition transform active:scale-95 cursor-pointer">
+                <span class="text-lg">⛶</span>
+                <span id="fullscreen-text">FULLSCREEN</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN SCREEN CENTER AREA (Shows background graphic until a tab is clicked) -->
+    <main class="relative z-10 flex-grow flex items-center justify-center pointer-events-none"></main>
+
+    <!-- CENTER-BOTTOM FLOATING TABS DOCK -->
+    <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 center-pill-dock p-2.5 rounded-full flex items-center gap-3 max-w-[95vw] pointer-events-auto">
+        <button id="pill-btn-1" onclick="openPill('pill-1')" class="pill-tab-btn px-6 py-3.5 bg-gradient-to-r from-sky-500 to-sky-600 text-white font-bold font-fredoka text-base md:text-xl rounded-full shadow-lg flex items-center gap-3 cursor-pointer whitespace-nowrap">
+            <span class="text-2xl">🎴</span> <span>Flashcards</span>
+        </button>
+        <button id="pill-btn-2" onclick="openPill('pill-2')" class="pill-tab-btn px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold font-fredoka text-base md:text-xl rounded-full shadow-lg flex items-center gap-3 cursor-pointer whitespace-nowrap">
+            <span class="text-2xl">🐤</span> <span>Spelling Challenge</span>
+        </button>
+        <button id="pill-btn-3" onclick="openPill('pill-3')" class="pill-tab-btn px-6 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold font-fredoka text-base md:text-xl rounded-full shadow-lg flex items-center gap-3 cursor-pointer whitespace-nowrap">
+            <span class="text-2xl">📅</span> <span>What day is it?</span>
+        </button>
+    </nav>
+
+
+    <!-- ===================================================================
+         FULLSCREEN OVERLAY 1: LARGE FLASHCARDS CAROUSEL
+         =================================================================== -->
+    <section id="pill-1" class="fullscreen-window p-4 md:p-8">
+        <div class="max-w-5xl mx-auto w-full h-full flex flex-col">
+            <!-- Window Header -->
+            <div class="flex items-center justify-between text-white mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-4xl bg-sky-500 p-2.5 rounded-2xl">🎴</span>
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold font-fredoka">Weekday Flashcards</h2>
+                        <p class="text-xs md:text-sm text-sky-200">Tap card to play MP3 audio</p>
+                    </div>
+                </div>
+                <button onclick="closePill('pill-1')" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold font-fredoka text-base md:text-lg rounded-full shadow-xl transition transform active:scale-95 flex items-center gap-2 cursor-pointer">
+                    <span>✕</span> <span>CLOSE</span>
+                </button>
+            </div>
+
+            <!-- Carousel Display Area -->
+            <div class="flex-grow flex items-center justify-center relative my-auto">
+                <!-- Left Navigation Arrow -->
+                <button onclick="prevCard()" class="absolute left-0 md:left-4 z-20 w-16 h-16 md:w-20 md:h-20 bg-white/90 hover:bg-white text-sky-600 rounded-full shadow-2xl border-4 border-sky-300 flex items-center justify-center text-3xl font-bold transition transform active:scale-90 cursor-pointer">
+                    ◄
+                </button>
+
+                <!-- Giant Flashcard -->
+                <div id="flashcard-card" onclick="triggerCardAudio()" 
+                     class="glass-panel w-full max-w-2xl h-[480px] md:h-[540px] p-8 mx-12 flex flex-col items-center justify-between shadow-2xl cursor-pointer transform hover:scale-[1.02] transition duration-200">
+                    
+                    <div class="w-full flex items-center justify-between">
+                        <span id="fc-day-tag" class="text-base md:text-lg font-bold px-5 py-2 rounded-full text-white shadow-md">
+                            Day 1
+                        </span>
+                        <span class="w-14 h-14 bg-sky-100 hover:bg-sky-200 rounded-full text-sky-600 text-2xl font-bold flex items-center justify-center shadow-md">
+                            🔊
+                        </span>
+                    </div>
+
+                    <div id="fc-bird-svg" class="my-auto transform scale-125 md:scale-150"></div>
+
+                    <div class="text-center w-full">
+                        <div id="fc-day-name" class="text-5xl md:text-7xl font-bold font-fredoka text-slate-800 tracking-wide">
+                            Monday
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Navigation Arrow -->
+                <button onclick="nextCard()" class="absolute right-0 md:right-4 z-20 w-16 h-16 md:w-20 md:h-20 bg-white/90 hover:bg-white text-sky-600 rounded-full shadow-2xl border-4 border-sky-300 flex items-center justify-center text-3xl font-bold transition transform active:scale-90 cursor-pointer">
+                    ►
+                </button>
+            </div>
+
+            <!-- Page Counter Indicator -->
+            <div class="flex justify-center pb-8">
+                <span id="fc-counter" class="bg-white/90 backdrop-blur-md px-6 py-2 rounded-full font-bold font-fredoka text-sky-700 text-lg shadow-lg">
+                    1 / 7
+                </span>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================================================================
+         FULLSCREEN OVERLAY 2: BIRD SPELLING CHALLENGE (15 ROUNDS)
+         =================================================================== -->
+    <section id="pill-2" class="fullscreen-window p-4 md:p-8">
+        <div class="max-w-6xl mx-auto w-full h-full flex flex-col">
+            <!-- Window Header -->
+            <div class="flex items-center justify-between text-white mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-4xl bg-emerald-500 p-2.5 rounded-2xl">🐤</span>
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold font-fredoka">Bird Spelling Challenge</h2>
+                        <p class="text-xs md:text-sm text-emerald-200">Catch the flying birds to spell the word!</p>
+                    </div>
+                </div>
+                <button onclick="closePill('pill-2')" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold font-fredoka text-base md:text-lg rounded-full shadow-xl transition transform active:scale-95 flex items-center gap-2 cursor-pointer">
+                    <span>✕</span> <span>CLOSE</span>
+                </button>
+            </div>
+
+            <!-- Top Game HUD Header -->
+            <div class="bg-white/95 rounded-3xl p-4 mb-4 border-2 border-emerald-300 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+                <div class="flex items-center gap-3">
+                    <div class="bg-sky-50 px-4 py-2 rounded-2xl border border-sky-200 text-center">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Round</span>
+                        <span id="spelling-round" class="text-xl font-bold font-fredoka text-sky-600">1 / 15</span>
+                    </div>
+                    <div class="bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-200 text-center">
+                        <span class="text-[10px] text-emerald-500 font-bold uppercase block tracking-wider">Score</span>
+                        <span id="spelling-score" class="text-xl font-bold font-fredoka text-emerald-600">0</span>
+                    </div>
+                    <div class="bg-amber-50 px-4 py-2 rounded-2xl border border-amber-200 text-center">
+                        <span class="text-[10px] text-amber-500 font-bold uppercase block tracking-wider">Streak</span>
+                        <span id="spelling-streak" class="text-xl font-bold font-fredoka text-amber-600">0 🔥</span>
+                    </div>
+                </div>
+
+                <!-- Word Display Container with Interactive Letter Slots -->
+                <div class="flex-grow text-center bg-gradient-to-r from-emerald-600 to-teal-600 py-3 px-6 rounded-2xl text-white shadow-inner">
+                    <div class="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-1">Catch the Missing Letters</div>
+                    <div id="spelling-word-display" class="flex items-center justify-center text-3xl md:text-5xl font-bold font-fredoka tracking-wider">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
+                <button onclick="startSpellingGame()" class="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold font-fredoka text-base rounded-2xl shadow-md transition transform active:scale-95 cursor-pointer">
+                    🔄 Restart
+                </button>
+            </div>
+
+            <!-- Flying Sky Interactive Area -->
+            <div id="spelling-sky-area" class="relative flex-grow bg-gradient-to-b from-sky-400 via-sky-300 to-sky-100 rounded-3xl border-4 border-white shadow-2xl overflow-hidden mb-4">
+                <div id="spelling-birds-layer" class="relative w-full h-full z-10"></div>
+
+                <!-- Game Overlay Screen -->
+                <div id="spelling-start-overlay" class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-white text-center">
+                    <span class="text-7xl mb-4 animate-bounce">🐤</span>
+                    <h3 class="text-3xl md:text-4xl font-bold font-fredoka mb-2">Flying Bird Spelling Quiz</h3>
+                    <p class="text-base text-sky-200 max-w-lg mb-6">Complete 15 randomized weekday spelling rounds! Birds fly with letters—tap the right letters in any order!</p>
+                    <button onclick="startSpellingGame()" class="px-10 py-4 bg-amber-400 hover:bg-amber-300 text-slate-900 text-xl font-bold font-fredoka rounded-2xl shadow-2xl transition transform active:scale-95 cursor-pointer">
+                        Start Spelling Challenge 🚀
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================================================================
+         FULLSCREEN OVERLAY 3: RANDOM CALENDAR QUIZ
+         =================================================================== -->
+    <section id="pill-3" class="fullscreen-window p-4 md:p-8">
+        <div class="max-w-6xl mx-auto w-full h-full flex flex-col">
+            <!-- Window Header -->
+            <div class="flex items-center justify-between text-white mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-4xl bg-amber-500 p-2.5 rounded-2xl">📅</span>
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold font-fredoka">What day is it?</h2>
+                        <p class="text-xs md:text-sm text-amber-200">Look at the calendar date and select the matching day</p>
+                    </div>
+                </div>
+                <button onclick="closePill('pill-3')" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold font-fredoka text-base md:text-lg rounded-full shadow-xl transition transform active:scale-95 flex items-center gap-2 cursor-pointer">
+                    <span>✕</span> <span>CLOSE</span>
+                </button>
+            </div>
+
+            <!-- Quiz Layout Container -->
+            <div class="flex-grow grid grid-cols-1 md:grid-cols-12 gap-6 items-center my-auto">
+                <!-- Calendar Component -->
+                <div class="md:col-span-7 bg-white p-6 rounded-3xl border-2 border-amber-300 shadow-2xl">
+                    <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                        <h3 id="cal-month-title" class="text-2xl font-bold font-fredoka text-amber-600">October 2026</h3>
+                        <span class="text-xs font-bold text-slate-400 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">Calendar View</span>
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-1 text-center font-bold text-sm text-slate-400 mb-2">
+                        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                    </div>
+
+                    <div id="cal-grid" class="grid grid-cols-7 gap-2 text-center"></div>
+                </div>
+
+                <!-- Answer Choices Component -->
+                <div class="md:col-span-5 flex flex-col justify-center gap-6 bg-white/90 p-8 rounded-3xl border-2 border-amber-200 shadow-2xl">
+                    <div class="text-center">
+                        <span class="text-xs font-bold text-amber-600 uppercase tracking-widest block mb-1">Calendar Prompt</span>
+                        <div id="cal-question-text" class="text-2xl md:text-4xl font-bold font-fredoka text-slate-800 leading-tight">
+                            What day of the week is October 17?
+                        </div>
+                    </div>
+
+                    <div id="cal-choices-container" class="flex flex-col gap-4"></div>
+
+                    <div class="flex items-center justify-between mt-2 pt-4 border-t border-slate-200 text-base font-bold">
+                        <span class="text-slate-500">Streak: <span id="cal-streak" class="text-amber-500 font-fredoka text-xl">0 🔥</span></span>
+                        <span class="text-slate-500">Score: <span id="cal-score" class="text-emerald-500 font-fredoka text-xl">0</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- APPLICATION LOGIC & AUDIO ENGINE -->
+    <script>
+        /* ==========================================================================
+           1. DATA CONFIGURATION & AUDIO INITIALIZATION
+           ========================================================================== */
+        const WEEKDAYS = [
+            { id: 'monday', dayNum: 1, english: 'Monday', short: 'Mon', fileName: 'monday.mp3', color: '#3b82f6', bgLight: '#dbeafe' },
+            { id: 'tuesday', dayNum: 2, english: 'Tuesday', short: 'Tue', fileName: 'tuesday.mp3', color: '#ef4444', bgLight: '#fee2e2' },
+            { id: 'wednesday', dayNum: 3, english: 'Wednesday', short: 'Wed', fileName: 'wednesday.mp3', color: '#06b6d4', bgLight: '#cffaff' },
+            { id: 'thursday', dayNum: 4, english: 'Thursday', short: 'Thu', fileName: 'thursday.mp3', color: '#10b981', bgLight: '#d1fae5' },
+            { id: 'friday', dayNum: 5, english: 'Friday', short: 'Fri', fileName: 'friday.mp3', color: '#eab308', bgLight: '#fef9c3' },
+            { id: 'saturday', dayNum: 6, english: 'Saturday', short: 'Sat', fileName: 'saturday.mp3', color: '#8b5cf6', bgLight: '#f3e8ff' },
+            { id: 'sunday', dayNum: 7, english: 'Sunday', short: 'Sun', fileName: 'sunday.mp3', color: '#f97316', bgLight: '#ffedd5' }
+        ];
+
+        let isMuted = false;
+        let audioCtx = null;
+        let currentCardIdx = 0;
+        let birdSoundInterval = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('sound-icon').innerText = isMuted ? '🔇' : '🔊';
+        }
+
+        /* Interactive Web Audio Synthesizer for bird chirps and sound effects */
+        function playSoundFx(type) {
+            if (isMuted) return;
+            initAudio();
+            try {
+                const ctx = audioCtx;
+                if (type === 'chirp') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1400 + Math.random() * 400, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(2200 + Math.random() * 300, ctx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(); osc.stop(ctx.currentTime + 0.12);
+                } else if (type === 'correct') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+                    osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(); osc.stop(ctx.currentTime + 0.35);
+                } else if (type === 'wrong') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(240, ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(140, ctx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(); osc.stop(ctx.currentTime + 0.25);
+                }
+            } catch(e) {}
+        }
+
+        /* Plays local MP3 audio with SpeechSynthesis fallback */
+        function playDayAudio(dayId, wordText) {
+            playSoundFx('chirp');
+            if (isMuted) return;
+
+            const dayData = WEEKDAYS.find(w => w.id === dayId);
+            const relativeAudio = new Audio(dayData.fileName);
+            relativeAudio.play().catch(() => {
+                fallbackSpeechSynthesis(wordText);
+            });
+        }
+
+        function fallbackSpeechSynthesis(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+
+        /* ==========================================================================
+           2. SVG BIRD GENERATOR
+           ========================================================================== */
+        function createBirdSVG(color = '#3b82f6', label = '', size = 95) {
+            return `
+                <div class="relative flex flex-col items-center transform hover:scale-105 transition duration-150">
+                    ${label ? `
+                        <div class="mb-1 px-4 py-1.5 bg-white rounded-full shadow-lg text-2xl font-bold font-fredoka text-slate-800 border-2 border-sky-300 whitespace-nowrap">
+                            ${label}
+                        </div>
+                    ` : ''}
+                    <svg width="${size}" height="${size}" viewBox="0 0 100 100" class="drop-shadow-md">
+                        <path class="wing-left" d="M 30,50 C 10,30 10,60 30,55" fill="${color}" opacity="0.9"/>
+                        <path class="wing-right" d="M 70,50 C 90,30 90,60 70,55" fill="${color}" opacity="0.9"/>
+                        <circle cx="50" cy="50" r="30" fill="${color}" />
+                        <circle cx="50" cy="58" r="18" fill="#ffffff" opacity="0.85" />
+                        <circle cx="40" cy="42" r="4" fill="#1e293b" />
+                        <circle cx="60" cy="42" r="4" fill="#1e293b" />
+                        <circle cx="41" cy="40" r="1.5" fill="#ffffff" />
+                        <circle cx="61" cy="40" r="1.5" fill="#ffffff" />
+                        <polygon points="50,48 44,56 56,56" fill="#f97316" />
+                    </svg>
+                </div>
+            `;
+        }
+
+
+        /* ==========================================================================
+           3. FULLSCREEN MODAL NAVIGATION SYSTEM
+           ========================================================================== */
+        function openPill(pillId) {
+            initAudio();
+            ['pill-1', 'pill-2', 'pill-3'].forEach(id => {
+                const win = document.getElementById(id);
+                if (id === pillId) {
+                    win.classList.add('active-window');
+                } else {
+                    win.classList.remove('active-window');
+                }
+            });
+
+            if (pillId === 'pill-1') {
+                renderCard();
+            } else if (pillId === 'pill-2') {
+                startContinuousBirdAudio();
+            } else if (pillId === 'pill-3') {
+                generateRandomCalendarQuiz();
+            }
+        }
+
+        function closePill(pillId) {
+            document.getElementById(pillId).classList.remove('active-window');
+            if (pillId === 'pill-2') {
+                stopContinuousBirdAudio();
+            }
+        }
+
+
+        /* ==========================================================================
+           4. PILL 1: LARGE CAROUSEL FLASHCARDS
+           ========================================================================== */
+        function renderCard() {
+            const day = WEEKDAYS[currentCardIdx];
+            const cardEl = document.getElementById('flashcard-card');
+            
+            document.getElementById('fc-day-tag').innerText = `Day ${day.dayNum}`;
+            document.getElementById('fc-day-tag').style.backgroundColor = day.color;
+            document.getElementById('fc-bird-svg').innerHTML = createBirdSVG(day.color, '', 100);
+            document.getElementById('fc-day-name').innerText = day.english;
+            document.getElementById('fc-counter').innerText = `${currentCardIdx + 1} / ${WEEKDAYS.length}`;
+            
+            cardEl.style.background = `linear-gradient(135deg, #ffffff 65%, ${day.bgLight} 100%)`;
+        }
+
+        function triggerCardAudio() {
+            const day = WEEKDAYS[currentCardIdx];
+            playDayAudio(day.id, day.english);
+        }
+
+        function nextCard() {
+            currentCardIdx = (currentCardIdx + 1) % WEEKDAYS.length;
+            renderCard();
+            triggerCardAudio();
+        }
+
+        function prevCard() {
+            currentCardIdx = (currentCardIdx - 1 + WEEKDAYS.length) % WEEKDAYS.length;
+            renderCard();
+            triggerCardAudio();
+        }
+
+
+        /* ==========================================================================
+           5. PILL 2: BIRD SPELLING CHALLENGE (TITLE CASE, MULTI-MISSING, NON-CHRONO)
+           ========================================================================== */
+        let spellingRound = 1;
+        let spellingScore = 0;
+        let spellingStreak = 0;
+        let currentWordData = null;
+        let targetWordStr = "";
+        let missingIndices = [];
+        let userFilledMap = {};
+        let spellingActiveBirds = [];
+
+        function startSpellingGame() {
+            document.getElementById('spelling-start-overlay').classList.add('hidden');
+            spellingRound = 1;
+            spellingScore = 0;
+            spellingStreak = 0;
+            updateSpellingHUD();
+            nextSpellingRound();
+        }
+
+        function updateSpellingHUD() {
+            document.getElementById('spelling-round').innerText = `${spellingRound} / 15`;
+            document.getElementById('spelling-score').innerText = spellingScore;
+            document.getElementById('spelling-streak').innerText = `${spellingStreak} 🔥`;
+        }
+
+        function nextSpellingRound() {
+            const layer = document.getElementById('spelling-birds-layer');
+            layer.innerHTML = '';
+            spellingActiveBirds.forEach(b => clearInterval(b.interval));
+            spellingActiveBirds = [];
+
+            if (spellingRound > 15) {
+                playSoundFx('correct');
+                if (typeof confetti === 'function') {
+                    confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
+                }
+                const overlay = document.getElementById('spelling-start-overlay');
+                overlay.classList.remove('hidden');
+                overlay.querySelector('h3').innerText = "🏆 Challenge Completed!";
+                overlay.querySelector('p').innerText = `Awesome spelling! Final Score: ${spellingScore}`;
+                return;
+            }
+
+            // Select random day in standard Title Case (e.g. Monday, Tuesday)
+            currentWordData = WEEKDAYS[Math.floor(Math.random() * WEEKDAYS.length)];
+            targetWordStr = currentWordData.english;
+            
+            // Randomly choose 2 or 3 missing letter indices
+            const numMissing = Math.random() < 0.5 ? 2 : 3;
+            missingIndices = [];
+            while (missingIndices.length < numMissing) {
+                const randIdx = Math.floor(Math.random() * targetWordStr.length);
+                if (!missingIndices.includes(randIdx)) {
+                    missingIndices.push(randIdx);
+                }
+            }
+
+            userFilledMap = {};
+            renderWordSlots();
+
+            // Gather candidate letters (correct missing letters + distractors)
+            const neededLetters = missingIndices.map(idx => targetWordStr[idx]);
+            const distractors = [];
+            const alphabetLower = 'abcdefghijklmnopqrstuvwxyz';
+            const alphabetUpper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+            while (distractors.length < (6 - neededLetters.length)) {
+                const isCap = Math.random() < 0.2;
+                const randChar = isCap ? 
+                    alphabetUpper[Math.floor(Math.random() * 26)] : 
+                    alphabetLower[Math.floor(Math.random() * 26)];
+                if (!neededLetters.includes(randChar) && !distractors.includes(randChar)) {
+                    distractors.push(randChar);
+                }
+            }
+
+            const allBirdLetters = [...neededLetters, ...distractors];
+            allBirdLetters.sort(() => Math.random() - 0.5);
+
+            // Launch all birds into the sky simultaneously
+            allBirdLetters.forEach((letter, index) => {
+                spawnSpellingBird(letter, index, allBirdLetters.length);
+            });
+        }
+
+        function renderWordSlots() {
+            const container = document.getElementById('spelling-word-display');
+            container.innerHTML = targetWordStr.split('').map((char, idx) => {
+                if (missingIndices.includes(idx)) {
+                    const filledVal = userFilledMap[idx];
+                    if (filledVal) {
+                        return `<span class="letter-slot filled text-amber-300 font-bold">${filledVal}</span>`;
+                    }
+                    return `<span class="letter-slot font-bold">_</span>`;
+                }
+                return `<span class="mx-1 text-white font-bold">${char}</span>`;
+            }).join('');
+        }
+
+        function spawnSpellingBird(letter, index, total) {
+            const layer = document.getElementById('spelling-birds-layer');
+            const birdEl = document.createElement('div');
+            birdEl.className = 'absolute cursor-pointer transition-transform duration-75 ease-linear select-none touch-manipulation z-20';
+            
+            const topPercent = 6 + (index * (75 / total));
+            birdEl.style.top = `${topPercent}%`;
+            
+            const direction = index % 2 === 0 ? 1 : -1;
+            let currentX = direction === 1 ? -120 : layer.clientWidth + 40;
+            birdEl.style.left = `${currentX}px`;
+
+            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f97316', '#8b5cf6', '#06b6d4'];
+            const randomColor = colors[index % colors.length];
+            birdEl.innerHTML = createBirdSVG(randomColor, letter, 85);
+
+            const handleCatch = (e) => {
+                e.preventDefault();
+                checkBirdClick(letter, birdEl);
+            };
+            birdEl.addEventListener('pointerdown', handleCatch);
+
+            layer.appendChild(birdEl);
+
+            const speed = 1.2 + Math.random() * 0.9;
+            const animateId = setInterval(() => {
+                currentX += speed * direction;
+                birdEl.style.left = `${currentX}px`;
+
+                if (direction === 1 && currentX > layer.clientWidth + 80) {
+                    currentX = -100;
+                } else if (direction === -1 && currentX < -110) {
+                    currentX = layer.clientWidth + 60;
+                }
+            }, 30);
+
+            spellingActiveBirds.push({ element: birdEl, interval: animateId });
+        }
+
+        /* Non-chronological letter checking */
+        function checkBirdClick(letter, birdEl) {
+            // Find an unfilled missing slot matching this letter
+            const matchingSlotIdx = missingIndices.find(idx => targetWordStr[idx] === letter && !userFilledMap[idx]);
+
+            if (matchingSlotIdx !== undefined) {
+                playSoundFx('correct');
+                userFilledMap[matchingSlotIdx] = letter;
+                renderWordSlots();
+
+                birdEl.classList.add('opacity-30', 'pointer-events-none');
+
+                // Check if all missing slots for the word are complete
+                const isComplete = missingIndices.every(idx => userFilledMap[idx] !== undefined);
+
+                if (isComplete) {
+                    spellingScore += 10 + (spellingStreak * 2);
+                    spellingStreak++;
+                    spellingRound++;
+                    
+                    if (typeof confetti === 'function') {
+                        confetti({ particleCount: 30, spread: 70, origin: { y: 0.6 } });
+                    }
+                    updateSpellingHUD();
+                    setTimeout(() => nextSpellingRound(), 800);
+                }
+            } else {
+                playSoundFx('wrong');
+                spellingStreak = 0;
+                updateSpellingHUD();
+                birdEl.classList.add('animate-bounce');
+                setTimeout(() => birdEl.classList.remove('animate-bounce'), 500);
+            }
+        }
+
+        /* Continuous Ambient Bird Chirping while flying */
+        function startContinuousBirdAudio() {
+            stopContinuousBirdAudio();
+            birdSoundInterval = setInterval(() => {
+                if (Math.random() < 0.45 && document.getElementById('pill-2').classList.contains('active-window')) {
+                    playSoundFx('chirp');
+                }
+            }, 3500);
+        }
+
+        function stopContinuousBirdAudio() {
+            if (birdSoundInterval) {
+                clearInterval(birdSoundInterval);
+                birdSoundInterval = null;
+            }
+        }
+
+
+        /* ==========================================================================
+           6. PILL 3: RANDOM CALENDAR QUIZ
+           ========================================================================== */
+        let calScore = 0;
+        let calStreak = 0;
+        let calTargetDayName = '';
+
+        function generateRandomCalendarQuiz() {
+            const year = 2025 + Math.floor(Math.random() * 3);
+            const monthIdx = Math.floor(Math.random() * 12);
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            
+            const firstDayOfMonth = new Date(year, monthIdx, 1).getDay();
+            const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+
+            const targetDate = Math.floor(Math.random() * daysInMonth) + 1;
+            const targetDateObj = new Date(year, monthIdx, targetDate);
+            
+            const dayOfWeekIdx = targetDateObj.getDay();
+            const dayNamesOrdered = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            calTargetDayName = dayNamesOrdered[dayOfWeekIdx];
+
+            document.getElementById('cal-month-title').innerText = `${monthNames[monthIdx]} ${year}`;
+            document.getElementById('cal-question-text').innerText = `What day of the week is ${monthNames[monthIdx]} ${targetDate}?`;
+
+            const gridContainer = document.getElementById('cal-grid');
+            gridContainer.innerHTML = '';
+
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'py-3 text-slate-200';
+                gridContainer.appendChild(emptyCell);
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const cell = document.createElement('div');
+                if (d === targetDate) {
+                    cell.className = 'py-3 rounded-2xl font-bold bg-amber-400 text-slate-900 border-2 border-amber-500 shadow-lg text-lg pulse-target flex items-center justify-center';
+                } else {
+                    cell.className = 'py-3 rounded-2xl text-slate-700 bg-slate-50 border border-slate-100 text-base font-semibold flex items-center justify-center';
+                }
+                cell.innerText = d;
+                gridContainer.appendChild(cell);
+            }
+
+            const choicesContainer = document.getElementById('cal-choices-container');
+            choicesContainer.innerHTML = '';
+
+            const choices = [calTargetDayName];
+            while (choices.length < 3) {
+                const randDay = dayNamesOrdered[Math.floor(Math.random() * 7)];
+                if (!choices.includes(randDay)) {
+                    choices.push(randDay);
+                }
+            }
+            choices.sort(() => Math.random() - 0.5);
+
+            choices.forEach(choiceName => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full py-4 px-6 rounded-2xl bg-white hover:bg-amber-500 hover:text-white font-bold font-fredoka text-slate-700 border-2 border-amber-300 shadow-md transition transform active:scale-95 text-center text-xl md:text-2xl cursor-pointer';
+                btn.innerText = choiceName;
+                
+                const handleChoice = (e) => {
+                    e.preventDefault();
+                    checkCalendarChoice(choiceName, btn);
+                };
+                btn.addEventListener('pointerdown', handleChoice);
+
+                choicesContainer.appendChild(btn);
+            });
+        }
+
+        function checkCalendarChoice(selectedName, btnEl) {
+            if (selectedName === calTargetDayName) {
+                playSoundFx('correct');
+                calScore += 10;
+                calStreak++;
+                document.getElementById('cal-score').innerText = calScore;
+                document.getElementById('cal-streak').innerText = `${calStreak} 🔥`;
+                
+                btnEl.classList.remove('bg-white', 'hover:bg-amber-500', 'text-slate-700');
+                btnEl.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600');
+
+                if (typeof confetti === 'function') {
+                    confetti({ particleCount: 35, spread: 75, origin: { y: 0.7 } });
+                }
+                setTimeout(() => generateRandomCalendarQuiz(), 850);
+            } else {
+                playSoundFx('wrong');
+                calStreak = 0;
+                document.getElementById('cal-streak').innerText = `0 🔥`;
+                btnEl.classList.add('bg-red-500', 'text-white', 'border-red-600');
+                setTimeout(() => {
+                    btnEl.classList.remove('bg-red-500', 'text-white', 'border-red-600');
+                }, 500);
+            }
+        }
+
+
+        /* ==========================================================================
+           7. FULLSCREEN TOGGLE SYSTEM
+           ========================================================================== */
+        function toggleFullscreen() {
+            const btnText = document.getElementById('fullscreen-text');
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    if (btnText) btnText.innerText = 'EXIT FULLSCREEN';
+                }).catch(err => {
+                    console.log("Fullscreen error: ", err);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().then(() => {
+                        if (btnText) btnText.innerText = 'FULLSCREEN';
+                    });
+                }
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const btnText = document.getElementById('fullscreen-text');
+            if (!document.fullscreenElement && btnText) {
+                btnText.innerText = 'FULLSCREEN';
+            }
+        });
+    </script>
+</body>
+</html>
